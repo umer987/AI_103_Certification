@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI-103 Exam Simulator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a1a; line-height: 1.5; }
+  .nav { background: #0078d4; color: white; padding: 12px 24px; display: flex; gap: 8px; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  .nav h1 { font-size: 18px; margin-right: auto; }
+  .nav button { background: rgba(255,255,255,.15); color: white; border: 1px solid rgba(255,255,255,.3); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
+  .nav button:hover { background: rgba(255,255,255,.25); }
+  .nav button.active { background: white; color: #0078d4; }
+  .page { display: none; padding: 24px; max-width: 900px; margin: 0 auto; }
+  .page.active { display: block; }
+  .controls { background: white; border-radius: 10px; padding: 16px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .controls input, .controls select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+  .controls input { flex: 1; min-width: 180px; }
+  .controls button { padding: 8px 18px; border: none; border-radius: 6px; background: #0078d4; color: white; font-weight: 600; cursor: pointer; font-size: 14px; }
+  .controls button:hover { background: #106ebe; }
+  .controls button.secondary { background: #e1e1e1; color: #333; }
+  .controls button.danger { background: #d13438; }
+  .stats { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; font-size: 14px; color: #555; }
+  .stats span { background: white; padding: 6px 14px; border-radius: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .q-card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.08); border-left: 4px solid #0078d4; }
+  .q-card.correct { border-left-color: #107c10; }
+  .q-card.wrong { border-left-color: #d13438; }
+  .q-card.flagged { border-left-color: #ff8c00; }
+  .q-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .q-number { font-weight: 700; color: #0078d4; font-size: 15px; }
+  .q-badge { font-size: 12px; padding: 3px 10px; border-radius: 12px; background: #e8f0fe; color: #0078d4; font-weight: 600; }
+  .q-badge.multi { background: #fff4e5; color: #b85c00; }
+  .q-topic { font-size: 12px; color: #888; margin-bottom: 8px; }
+  .q-stem { font-size: 15px; margin-bottom: 12px; font-weight: 500; }
+  .q-code { background: #1e1e1e; color: #d4d4d4; padding: 14px; border-radius: 8px; font-family: 'Consolas','Monaco',monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; margin-bottom: 12px; }
+  .q-options { list-style: none; }
+  .q-options li { padding: 10px 14px; margin-bottom: 6px; border-radius: 8px; border: 1px solid #e1e1e1; cursor: pointer; font-size: 14px; display: flex; gap: 10px; align-items: flex-start; }
+  .q-options li:hover { background: #f5f9ff; border-color: #0078d4; }
+  .q-options li.selected { background: #e8f0fe; border-color: #0078d4; }
+  .q-options li.correct-answer { background: #dff6dd; border-color: #107c10; }
+  .q-options li.wrong-answer { background: #fde7e9; border-color: #d13438; }
+  .q-options li.disabled { cursor: default; pointer-events: none; }
+  .opt-letter { font-weight: 700; color: #0078d4; min-width: 22px; }
+  .q-answer { margin-top: 12px; padding: 12px 16px; background: #dff6dd; border-radius: 8px; font-size: 14px; border-left: 4px solid #107c10; }
+  .q-answer.wrong { background: #fde7e9; border-left-color: #d13438; }
+  .q-explanation { margin-top: 8px; padding: 12px 16px; background: #f3f2f1; border-radius: 8px; font-size: 13px; color: #444; border-left: 4px solid #888; }
+  .q-flag { background: none; border: 1px solid #ccc; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: #666; }
+  .q-flag.on { background: #ff8c00; color: white; border-color: #ff8c00; }
+  .dropdown-group { margin-bottom: 12px; }
+  .dropdown-label { font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #555; }
+  .dropdown-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+  .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+  .page-header h2 { font-size: 22px; }
+  .pagination { display: flex; gap: 8px; justify-content: center; margin: 24px 0; flex-wrap: wrap; }
+  .pagination button { min-width: 40px; padding: 8px 12px; border: 1px solid #ccc; background: white; border-radius: 6px; cursor: pointer; font-size: 14px; }
+  .pagination button.active { background: #0078d4; color: white; border-color: #0078d4; }
+  .pagination button:disabled { opacity: .4; cursor: default; }
+  .result-banner { background: white; border-radius: 10px; padding: 24px; text-align: center; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .result-banner h2 { font-size: 28px; margin-bottom: 8px; }
+  .result-banner .score { font-size: 48px; font-weight: 800; }
+  .result-banner .score.pass { color: #107c10; }
+  .result-banner .score.fail { color: #d13438; }
+  .result-banner p { color: #666; margin-top: 8px; }
+  .review-list { max-height: 600px; overflow-y: auto; }
+  .loading { text-align: center; padding: 60px 20px; font-size: 18px; color: #555; }
+  .loading .spinner { display: inline-block; width: 40px; height: 40px; border: 4px solid #e1e1e1; border-top-color: #0078d4; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error { background: #fde7e9; border-left: 4px solid #d13438; padding: 20px; border-radius: 8px; margin: 20px auto; max-width: 700px; }
+  .error h3 { color: #d13438; margin-bottom: 10px; }
+  .error code { background: #fff; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+  @media (max-width: 600px) {
+    .nav h1 { font-size: 14px; }
+    .nav button { padding: 6px 10px; font-size: 12px; }
+    .page { padding: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <h1>AI-103 Exam Simulator</h1>
+  <button id="navStudy" class="active" onclick="showPage('study')">Study Mode</button>
+  <button id="navExam" onclick="showPage('exam')">Exam Mode</button>
+</div>
+
+<div id="loadingScreen" class="loading">
+  <div class="spinner"></div>
+  <div>Loading questions.json...</div>
+</div>
+
+<div id="errorScreen" style="display:none;"></div>
+
+<!-- STUDY PAGE -->
+<div id="pageStudy" class="page">
+  <div class="page-header"><h2>Study Mode — All Questions & Answers</h2></div>
+  <div class="controls">
+    <input type="text" id="studySearch" placeholder="Search questions, topics, keywords...">
+    <select id="studySection"><option value="">All Sections</option></select>
+    <button onclick="renderStudy()">Search</button>
+    <button class="secondary" onclick="clearStudyFilters()">Clear</button>
+  </div>
+  <div class="stats" id="studyStats"></div>
+  <div id="studyList"></div>
+  <div class="pagination" id="studyPagination"></div>
+</div>
+
+<!-- EXAM PAGE -->
+<div id="pageExam" class="page">
+  <div id="examSetup">
+    <div class="page-header"><h2>Exam Mode</h2></div>
+    <div class="controls">
+      <label style="font-size:14px;color:#555;">Number of questions:
+        <select id="examCount">
+          <option value="50" selected>50</option>
+          <option value="25">25</option>
+          <option value="10">10</option>
+          <option value="100">100</option>
+        </select>
+      </label>
+      <label style="font-size:14px;color:#555;">Section:
+        <select id="examSection"><option value="">All Sections</option></select>
+      </label>
+      <button onclick="startExam()">Start Exam</button>
+    </div>
+  </div>
+
+  <div id="examActive" style="display:none;">
+    <div class="controls" style="position:sticky;top:60px;z-index:90;">
+      <span id="examProgress" style="font-weight:600;"></span>
+      <span id="examTimer" style="font-weight:700;color:#0078d4;margin-left:auto;font-size:16px;"></span>
+      <button class="secondary" onclick="toggleExamReview()" id="reviewBtn">Review Flagged</button>
+      <button class="danger" onclick="submitExam()">Submit Exam</button>
+    </div>
+    <div id="examQuestions"></div>
+  </div>
+
+  <div id="examResults" style="display:none;">
+    <div class="result-banner" id="resultBanner"></div>
+    <div class="controls">
+      <button onclick="startExam()">Retake Exam</button>
+      <button class="secondary" onclick="showPage('study')">Back to Study Mode</button>
+    </div>
+    <h3 style="margin-bottom:12px;">Review Answers</h3>
+    <div class="review-list" id="reviewList"></div>
+  </div>
+</div>
+
+<script>
+// ============ GLOBAL STATE ============
+let FULL_BANK = [];
+const LETTERS = ['A','B','C','D','E','F'];
+
+// ============ HELPERS ============
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function formatCode(code) {
+  if (!code) return '';
+  return '<div class="q-code">' + escapeHtml(code) + '</div>';
+}
+function parseAnswer(ans) {
+  if (!ans) return [];
+  return ans.split(',').map(s => s.trim().toUpperCase());
+}
+
+// ============ LOAD questions.json ============
+async function loadQuestions() {
+  try {
+    const response = await fetch('questions.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status} - Could not load questions.json`);
+    const data = await response.json();
+    if (!Array.isArray(data)) throw new Error('questions.json must contain a JSON array [ ... ]');
+    FULL_BANK = data;
+    console.log(`✅ Loaded ${FULL_BANK.length} questions from questions.json`);
+    document.getElementById('loadingScreen').style.display = 'none';
+    initApp();
+  } catch (err) {
+    console.error('❌ Failed to load questions.json:', err);
+    showLoadError(err.message);
+  }
+}
+
+function showLoadError(msg) {
+  document.getElementById('loadingScreen').style.display = 'none';
+  const el = document.getElementById('errorScreen');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="error">
+      <h3>⚠️ Could not load questions.json</h3>
+      <p><strong>Error:</strong> ${escapeHtml(msg)}</p>
+      <p style="margin-top:12px;">This happens if you opened <code>index.html</code> by double-clicking it (file:// mode). Browsers block local file reads for security.</p>
+      <p style="margin-top:12px;"><strong>Fix — pick one:</strong></p>
+      <ol style="margin-left:20px;margin-top:8px;line-height:1.8;">
+        <li>Run a local web server in this folder:
+          <br><code>python -m http.server 8000</code>
+          <br>Then open <code>http://localhost:8000/index.html</code>
+        </li>
+        <li>Or use VS Code's <b>Live Server</b> extension: right-click index.html → "Open with Live Server".</li>
+        <li>Or use the offline all-in-one version (data embedded inside the HTML).</li>
+      </ol>
+    </div>`;
+}
+
+// ============ APP INIT ============
+function initApp() {
+  initStudySections();
+  initExamSections();
+  renderStudy();
+}
+
+// ============ NAV ============
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  if (name === 'study') {
+    document.getElementById('pageStudy').classList.add('active');
+    document.getElementById('navStudy').classList.add('active');
+    renderStudy();
+  } else {
+    document.getElementById('pageExam').classList.add('active');
+    document.getElementById('navExam').classList.add('active');
+  }
+}
+
+// ============ STUDY MODE ============
+let studyPage = 1;
+const STUDY_PER_PAGE = 20;
+let studyFiltered = [];
+
+function initStudySections() {
+  const sections = [...new Set(FULL_BANK.map(q => q.section))];
+  const sel = document.getElementById('studySection');
+  sections.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    sel.appendChild(o);
+  });
+}
+function clearStudyFilters() {
+  document.getElementById('studySearch').value = '';
+  document.getElementById('studySection').value = '';
+  studyPage = 1;
+  renderStudy();
+}
+function renderStudy() {
+  const search = document.getElementById('studySearch').value.toLowerCase().trim();
+  const section = document.getElementById('studySection').value;
+
+  studyFiltered = FULL_BANK.filter(q => {
+    if (section && q.section !== section) return false;
+    if (search) {
+      const hay = [q.stem||'', q.topic||'', q.section||'', q.explanation||'',
+        (q.options||[]).join(' '), q.code||'',
+        (q.dropdowns||[]).map(d => d.choices.join(' ')).join(' ')].join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  const total = studyFiltered.length;
+  const totalPages = Math.ceil(total / STUDY_PER_PAGE) || 1;
+  if (studyPage > totalPages) studyPage = totalPages;
+
+  document.getElementById('studyStats').innerHTML =
+    `<span>Total questions: ${FULL_BANK.length}</span>
+     <span>Showing: ${total}</span>
+     <span>Page ${studyPage} of ${totalPages}</span>`;
+
+  const start = (studyPage - 1) * STUDY_PER_PAGE;
+  const pageItems = studyFiltered.slice(start, start + STUDY_PER_PAGE);
+  document.getElementById('studyList').innerHTML =
+    pageItems.map(q => renderStudyCard(q)).join('') ||
+    '<div style="text-align:center;padding:40px;color:#888;">No questions found.</div>';
+
+  renderPagination(totalPages, studyPage, 'studyPagination', p => {
+    studyPage = p; renderStudy();
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+}
+function renderStudyCard(q) {
+  const isMulti = (q.type || '').toLowerCase().includes('multiple');
+  const answerLetters = parseAnswer(q.answer);
+  let optionsHtml = '';
+
+  if (q.type === 'Dropdown choice' && q.dropdowns) {
+    optionsHtml = q.dropdowns.map((d, i) => {
+      const correct = d.correctAnswer;
+      return `<div class="dropdown-group">
+        <div class="dropdown-label">Blank ${i+1} (${escapeHtml(d.placeholder)}) — Correct: <strong style="color:#107c10;">${escapeHtml(correct)}</strong></div>
+        <select disabled style="background:#f9f9f9;">
+          ${d.choices.map(c => `<option ${c===correct?'selected':''}>${escapeHtml(c)}</option>`).join('')}
+        </select>
+      </div>`;
+    }).join('');
+  } else {
+    const opts = q.options || [];
+    optionsHtml = '<ul class="q-options">' + opts.map((opt, i) => {
+      const letter = LETTERS[i] || '?';
+      const isCorrect = answerLetters.includes(letter);
+      return `<li class="${isCorrect?'correct-answer':''} disabled">
+        <span class="opt-letter">${letter}.</span><span>${escapeHtml(opt)}</span>
+      </li>`;
+    }).join('') + '</ul>';
+  }
+
+  return `<div class="q-card">
+    <div class="q-header">
+      <span class="q-number">Q${q.number}</span>
+      <span class="q-badge ${isMulti?'multi':''}">${escapeHtml(q.type || 'Single answer')}</span>
+    </div>
+    <div class="q-topic">📂 ${escapeHtml(q.section || '')} › ${escapeHtml(q.topic || '')}</div>
+    <div class="q-stem">${escapeHtml(q.stem)}</div>
+    ${formatCode(q.code)}
+    ${optionsHtml}
+    <div class="q-answer">
+      <strong>✅ Correct Answer: ${escapeHtml(q.answer || '')}</strong>
+      ${q.explanation ? `<div class="q-explanation">💡 ${escapeHtml(q.explanation)}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+// ============ PAGINATION ============
+function renderPagination(totalPages, current, containerId, onClick) {
+  const el = document.getElementById(containerId);
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  let html = `<button ${current===1?'disabled':''} data-p="${current-1}">‹ Prev</button>`;
+  const start = Math.max(1, current - 2);
+  const end = Math.min(totalPages, current + 2);
+  if (start > 1) html += `<button data-p="1">1</button><span style="padding:8px;">…</span>`;
+  for (let i = start; i <= end; i++)
+    html += `<button class="${i===current?'active':''}" data-p="${i}">${i}</button>`;
+  if (end < totalPages) html += `<span style="padding:8px;">…</span><button data-p="${totalPages}">${totalPages}</button>`;
+  html += `<button ${current===totalPages?'disabled':''} data-p="${current+1}">Next ›</button>`;
+  el.innerHTML = html;
+  el.querySelectorAll('button[data-p]').forEach(b => {
+    b.onclick = () => onClick(parseInt(b.dataset.p));
+  });
+}
+
+// ============ EXAM MODE ============
+let examQuestions = [];
+let examAnswers = {};
+let examFlags = {};
+let examTimerInterval = null;
+let examSeconds = 0;
+let examActive = false;
+
+function initExamSections() {
+  const sections = [...new Set(FULL_BANK.map(q => q.section))];
+  const sel = document.getElementById('examSection');
+  sections.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    sel.appendChild(o);
+  });
+}
+function startExam() {
+  const count = parseInt(document.getElementById('examCount').value) || 50;
+  const section = document.getElementById('examSection').value;
+  let pool = FULL_BANK.filter(q => !section || q.section === section);
+  pool = shuffle(pool);
+  examQuestions = pool.slice(0, Math.min(count, pool.length));
+  examAnswers = {}; examFlags = {}; examSeconds = 0; examActive = true;
+
+  document.getElementById('examSetup').style.display = 'none';
+  document.getElementById('examActive').style.display = 'block';
+  document.getElementById('examResults').style.display = 'none';
+  document.getElementById('reviewBtn').textContent = 'Review Flagged';
+
+  renderExamQuestions();
+  updateExamProgress();
+  startTimer();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function startTimer() {
+  if (examTimerInterval) clearInterval(examTimerInterval);
+  examTimerInterval = setInterval(() => {
+    if (!examActive) return;
+    examSeconds++;
+    const m = Math.floor(examSeconds/60).toString().padStart(2,'0');
+    const s = (examSeconds%60).toString().padStart(2,'0');
+    document.getElementById('examTimer').textContent = `⏱ ${m}:${s}`;
+  }, 1000);
+  document.getElementById('examTimer').textContent = '⏱ 00:00';
+}
+function updateExamProgress() {
+  const answered = Object.keys(examAnswers).length;
+  document.getElementById('examProgress').textContent =
+    `📝 ${answered} / ${examQuestions.length} answered`;
+}
+function renderExamQuestions() {
+  document.getElementById('examQuestions').innerHTML =
+    examQuestions.map((q, i) => renderExamCard(q, i)).join('');
+}
+function renderExamCard(q, idx) {
+  const isMulti = (q.type || '').toLowerCase().includes('multiple');
+  const isDropdown = q.type === 'Dropdown choice' && q.dropdowns;
+  const flagged = examFlags[idx];
+  const selected = examAnswers[idx];
+  let optionsHtml = '';
+
+  if (isDropdown) {
+    optionsHtml = q.dropdowns.map(d => {
+      const chosen = (selected && selected[d.id]) || '';
+      return `<div class="dropdown-group">
+        <div class="dropdown-label">${escapeHtml(d.placeholder)}</div>
+        <select data-qidx="${idx}" data-dropid="${escapeHtml(d.id)}" class="exam-dropdown">
+          <option value="">-- Select --</option>
+          ${d.choices.map(c => `<option value="${escapeHtml(c)}" ${chosen===c?'selected':''}>${escapeHtml(c)}</option>`).join('')}
+        </select>
+      </div>`;
+    }).join('');
+  } else {
+    const opts = q.options || [];
+    const selArr = selected || [];
+    optionsHtml = '<ul class="q-options">' + opts.map((opt, i) => {
+      const letter = LETTERS[i] || '?';
+      const isSel = selArr.includes(letter);
+      return `<li class="${isSel?'selected':''}" data-qidx="${idx}" data-letter="${letter}" data-multi="${isMulti}">
+        <span class="opt-letter">${letter}.</span><span>${escapeHtml(opt)}</span>
+      </li>`;
+    }).join('') + '</ul>';
+  }
+
+  return `<div class="q-card ${flagged?'flagged':''}" id="examCard${idx}">
+    <div class="q-header">
+      <span class="q-number">Q${idx+1} of ${examQuestions.length} (Bank #${q.number})</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="q-badge ${isMulti?'multi':''}">${escapeHtml(q.type || 'Single answer')}</span>
+        <button class="q-flag ${flagged?'on':''}" onclick="toggleFlag(${idx})">${flagged?'⚑ Flagged':'⚐ Flag'}</button>
+      </div>
+    </div>
+    <div class="q-topic">📂 ${escapeHtml(q.section || '')} › ${escapeHtml(q.topic || '')}</div>
+    <div class="q-stem">${escapeHtml(q.stem)}</div>
+    ${formatCode(q.code)}
+    ${optionsHtml}
+  </div>`;
+}
+
+document.addEventListener('click', e => {
+  const li = e.target.closest('#examQuestions .q-options li');
+  if (!li || !examActive) return;
+  const idx = parseInt(li.dataset.qidx);
+  const letter = li.dataset.letter;
+  const isMulti = li.dataset.multi === 'true';
+  if (!examAnswers[idx]) examAnswers[idx] = [];
+  const arr = examAnswers[idx];
+  if (isMulti) {
+    const pos = arr.indexOf(letter);
+    if (pos >= 0) arr.splice(pos, 1); else arr.push(letter);
+  } else {
+    examAnswers[idx] = [letter];
+  }
+  if (examAnswers[idx].length === 0) delete examAnswers[idx];
+  const card = document.getElementById('examCard'+idx);
+  card.querySelectorAll('.q-options li').forEach(li2 => {
+    const l = li2.dataset.letter;
+    const sel = examAnswers[idx] && examAnswers[idx].includes(l);
+    li2.classList.toggle('selected', sel);
+  });
+  updateExamProgress();
+});
+
+document.addEventListener('change', e => {
+  const sel = e.target.closest('#examQuestions .exam-dropdown');
+  if (!sel || !examActive) return;
+  const idx = parseInt(sel.dataset.qidx);
+  const dropId = sel.dataset.dropid;
+  if (!examAnswers[idx]) examAnswers[idx] = {};
+  if (sel.value) examAnswers[idx][dropId] = sel.value;
+  else delete examAnswers[idx][dropId];
+  if (Object.keys(examAnswers[idx]).length === 0) delete examAnswers[idx];
+  updateExamProgress();
+});
+
+function toggleFlag(idx) {
+  examFlags[idx] = !examFlags[idx];
+  const card = document.getElementById('examCard'+idx);
+  const btn = card.querySelector('.q-flag');
+  if (examFlags[idx]) { card.classList.add('flagged'); btn.classList.add('on'); btn.textContent = '⚑ Flagged'; }
+  else { card.classList.remove('flagged'); btn.classList.remove('on'); btn.textContent = '⚐ Flag'; }
+}
+
+let showingFlaggedOnly = false;
+function toggleExamReview() {
+  showingFlaggedOnly = !showingFlaggedOnly;
+  document.getElementById('reviewBtn').textContent = showingFlaggedOnly ? 'Show All Questions' : 'Review Flagged';
+  const container = document.getElementById('examQuestions');
+  if (showingFlaggedOnly) {
+    const flaggedIdx = Object.keys(examFlags).filter(k => examFlags[k]).map(Number);
+    if (flaggedIdx.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:40px;color:#888;">No flagged questions.</div>';
+      return;
+    }
+    container.innerHTML = flaggedIdx.map(idx => renderExamCard(examQuestions[idx], idx)).join('');
+  } else {
+    renderExamQuestions();
+  }
+}
+
+function submitExam() {
+  const unanswered = examQuestions.length - Object.keys(examAnswers).length;
+  if (unanswered > 0) {
+    if (!confirm(`You have ${unanswered} unanswered question(s). Submit anyway?`)) return;
+  } else {
+    if (!confirm('Submit your exam?')) return;
+  }
+  examActive = false;
+  if (examTimerInterval) clearInterval(examTimerInterval);
+
+  let correct = 0;
+  const results = examQuestions.map((q, idx) => {
+    const userAns = examAnswers[idx];
+    let isCorrect = false;
+    if (q.type === 'Dropdown choice' && q.dropdowns) {
+      isCorrect = q.dropdowns.every(d => (userAns && userAns[d.id]) === d.correctAnswer);
+    } else {
+      const correctLetters = parseAnswer(q.answer);
+      const userLetters = userAns || [];
+      isCorrect = correctLetters.length === userLetters.length &&
+                  correctLetters.every(l => userLetters.includes(l));
+    }
+    if (isCorrect) correct++;
+    return { q, idx, userAns, isCorrect, correctLetters: parseAnswer(q.answer) };
+  });
+
+  const pct = Math.round((correct / examQuestions.length) * 100);
+  const passed = pct >= 70;
+  document.getElementById('resultBanner').innerHTML = `
+    <h2>${passed?'🎉 Passed!':'❌ Not Passed'}</h2>
+    <div class="score ${passed?'pass':'fail'}">${pct}%</div>
+    <p>${correct} out of ${examQuestions.length} correct &nbsp;|&nbsp; Time: ${Math.floor(examSeconds/60)}m ${examSeconds%60}s</p>
+    <p style="margin-top:4px;color:#888;">Passing threshold: 70%</p>`;
+
+  document.getElementById('reviewList').innerHTML = results.map(r => {
+    const q = r.q;
+    let optionsHtml = '';
+    if (q.type === 'Dropdown choice' && q.dropdowns) {
+      optionsHtml = q.dropdowns.map(d => {
+        const ua = r.userAns && r.userAns[d.id];
+        const ok = ua === d.correctAnswer;
+        return `<div class="dropdown-group">
+          <div class="dropdown-label">${escapeHtml(d.placeholder)}</div>
+          <div style="padding:8px;border-radius:6px;background:${ok?'#dff6dd':'#fde7e9'};border:1px solid ${ok?'#107c10':'#d13438'};font-size:13px;">
+            Your answer: <strong>${escapeHtml(ua||'(none)')}</strong>
+            ${!ok?` &nbsp;|&nbsp; Correct: <strong style="color:#107c10;">${escapeHtml(d.correctAnswer)}</strong>`:''}
+          </div></div>`;
+      }).join('');
+    } else {
+      const opts = q.options || [];
+      optionsHtml = '<ul class="q-options">' + opts.map((opt, i) => {
+        const letter = LETTERS[i] || '?';
+        const isCorrect = r.correctLetters.includes(letter);
+        const isUser = (r.userAns || []).includes(letter);
+        let cls = 'disabled';
+        if (isCorrect) cls += ' correct-answer';
+        else if (isUser) cls += ' wrong-answer';
+        return `<li class="${cls}"><span class="opt-letter">${letter}.</span>
+          <span>${escapeHtml(opt)}</span>
+          ${isUser?' <em style="color:#0078d4;font-size:12px;">(your answer)</em>':''}
+        </li>`;
+      }).join('') + '</ul>';
+    }
+    return `<div class="q-card ${r.isCorrect?'correct':'wrong'}">
+      <div class="q-header">
+        <span class="q-number">Q${r.idx+1} (Bank #${q.number}) ${r.isCorrect?'✅':'❌'}</span>
+        <span class="q-badge">${escapeHtml(q.type || 'Single answer')}</span>
+      </div>
+      <div class="q-topic">📂 ${escapeHtml(q.section||'')} › ${escapeHtml(q.topic||'')}</div>
+      <div class="q-stem">${escapeHtml(q.stem)}</div>
+      ${formatCode(q.code)}
+      ${optionsHtml}
+      <div class="q-answer ${r.isCorrect?'':'wrong'}">
+        <strong>${r.isCorrect?'✅ Correct':'❌ Incorrect'} — Correct Answer: ${escapeHtml(q.answer||'')}</strong>
+        ${q.explanation?`<div class="q-explanation">💡 ${escapeHtml(q.explanation)}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('examActive').style.display = 'none';
+  document.getElementById('examResults').style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ============ BOOT ============
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('studySearch').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { studyPage = 1; renderStudy(); }
+  });
+  loadQuestions();
+});
+</script>
+</body>
+</html>
